@@ -1,0 +1,47 @@
+from flask import Flask, request, jsonify
+from pymongo import MongoClient
+from bcrypt import hashpw, gensalt
+
+app = Flask(__name__)
+
+# Configuration de MongoDB
+client = MongoClient("mongodb://localhost:27017/")  # Remplacez par votre URI MongoDB
+db = client["votre_base_de_donnees"]  # Remplacez par le nom de votre base
+collection = db["utilisateurs"]
+
+@app.route('/inscription', methods=['POST'])
+def inscription():
+    try:
+        # Récupération des données de l'utilisateur
+        data = request.json
+        nom = data.get('nom')
+        email = data.get('email')
+        password = data.get('password')
+
+        # Validation des champs
+        if not nom or not email or not password:
+            return jsonify({"message": "Tous les champs sont obligatoires"}), 400
+        
+        # Vérification si l'email existe déjà
+        if collection.find_one({"email": email}):
+            return jsonify({"message": "Cet email est déjà utilisé"}), 409
+
+        # Hashage du mot de passe
+        hashed_password = hashpw(password.encode('utf-8'), gensalt())
+
+        # Sauvegarde dans la base de données
+        utilisateur = {
+            "nom": nom,
+            "email": email,
+            "password": hashed_password.decode('utf-8')
+        }
+        collection.insert_one(utilisateur)
+
+        return jsonify({"message": "Utilisateur créé avec succès"}), 201
+
+    except Exception as e:
+        return jsonify({"message": "Une erreur est survenue", "erreur": str(e)}), 500
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
